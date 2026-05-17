@@ -8,4 +8,4 @@ logs/
 .playwright/
 venv/
 jobbot.db
-
+.env.example

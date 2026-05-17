@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+data/jobbot.db
+data/cvs/
+data/certificates/
+logs/
+.playwright/
+venv/
+jobbot.db
+

@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>JobBot — Bewerbungsmanager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset + Variables ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d0f14;
+  --surface:  #151820;
+  --card:     #1c2030;
+  --border:   #252a3a;
+  --accent:   #3b82f6;
+  --accent2:  #22d3ee;
+  --green:    #10b981;
+  --yellow:   #f59e0b;
+  --red:      #ef4444;
+  --purple:   #8b5cf6;
+  --text:     #e2e8f0;
+  --muted:    #64748b;
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'DM Sans', sans-serif;
+  --radius:   8px;
+  --shadow:   0 4px 24px rgba(0,0,0,.4);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+}
+
+/* ── Layout ────────────────────────────────────────────────────── */
+#sidebar {
+  width: 220px;
+  min-height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+#content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+.logo {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.logo-mark {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent2);
+  letter-spacing: -0.5px;
+}
+.logo-sub {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.nav-item {
+  padding: 10px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-weight: 500;
+  transition: all .15s;
+  border-left: 3px solid transparent;
+  user-select: none;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,.03); }
+.nav-item.active {
+  color: var(--accent2);
+  border-left-color: var(--accent2);
+  background: rgba(34,211,238,.06);
+}
+.nav-icon { width: 16px; text-align: center; font-size: 15px; }
+
+.sidebar-section {
+  padding: 16px 20px 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+}
+
+#health-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin: auto 20px 8px;
+  transition: background .3s;
+}
+#health-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+#health-dot.warn { background: var(--yellow); }
+
+/* ── Top Bar ───────────────────────────────────────────────────── */
+.topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+input.search {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 7px 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  width: 220px;
+  outline: none;
+  transition: border-color .2s;
+}
+input.search:focus { border-color: var(--accent); }
+input.search::placeholder { color: var(--muted); }
+
+select.filter {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 7px 10px;
+  font-family: var(--sans);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  border: none;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #2563eb; }
+.btn-teal { background: rgba(34,211,238,.15); color: var(--accent2); border: 1px solid rgba(34,211,238,.3); }
+.btn-teal:hover:not(:disabled) { background: rgba(34,211,238,.25); }
+.btn-green { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+.btn-green:hover:not(:disabled) { background: rgba(16,185,129,.25); }
+.btn-red { background: rgba(239,68,68,.12); color: var(--red); border: 1px solid rgba(239,68,68,.25); }
+.btn-red:hover:not(:disabled) { background: rgba(239,68,68,.22); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* ── Cards ─────────────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 10px;
+  transition: border-color .2s;
+}
+.card:hover { border-color: #3a4060; }
+
+/* ── Job list ──────────────────────────────────────────────────── */
+.job-card {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+.job-title { font-weight: 600; font-size: 14px; color: var(--text); }
+.job-meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
+.job-meta span { display: flex; align-items: center; gap: 4px; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.badge-pending  { background: rgba(245,158,11,.15); color: var(--yellow); }
+.badge-applied  { background: rgba(59,130,246,.15); color: var(--accent); }
+.badge-rejected { background: rgba(239,68,68,.15); color: var(--red); }
+.badge-interview{ background: rgba(16,185,129,.15); color: var(--green); }
+.badge-ignored  { background: rgba(100,116,139,.15); color: var(--muted); }
+
+/* ── Scraper panel ─────────────────────────────────────────────── */
+.scraper-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.form-input {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 8px 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .2s;
+  width: 180px;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input-sm { width: 80px; }
+
+/* ── Detail panel ──────────────────────────────────────────────── */
+#detail-panel {
+  position: fixed;
+  right: 0; top: 0; bottom: 0;
+  width: 580px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .25s ease;
+  box-shadow: -8px 0 40px rgba(0,0,0,.5);
+}
+#detail-panel.open { transform: translateX(0); }
+#detail-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+#detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.detail-title { font-size: 17px; font-weight: 700; color: var(--text); }
+.detail-company { color: var(--accent2); font-size: 13px; margin-top: 2px; }
+
+.detail-section { margin-top: 20px; }
+.detail-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.desc-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #94a3b8;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 10px;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+  outline: none;
+  transition: border-color .2s;
+}
+.textarea:focus { border-color: var(--accent); }
+.textarea-sm { min-height: 60px; }
+.textarea-lg { min-height: 180px; }
+
+.action-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+/* ── Stats row ─────────────────────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+.stat-num { font-family: var(--mono); font-size: 28px; font-weight: 600; color: var(--accent2); }
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+/* ── Log ───────────────────────────────────────────────────────── */
+#log-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+  color: #64748b;
+}
+#log-box .log-ok { color: var(--green); }
+#log-box .log-err { color: var(--red); }
+#log-box .log-info { color: var(--accent2); }
+
+/* ── Overlay ───────────────────────────────────────────────────── */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 99;
+  display: none;
+}
+#overlay.show { display: block; }
+
+/* ── Spinner ───────────────────────────────────────────────────── */
+.spin {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toast ─────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 999;
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all .25s ease;
+  max-width: 320px;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.ok { border-left: 3px solid var(--green); }
+#toast.err { border-left: 3px solid var(--red); }
+
+/* ── Views ─────────────────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Empty state ───────────────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
+
+/* ── Status selector ───────────────────────────────────────────── */
+.status-select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div class="logo">
+    <div class="logo-mark">⚡ JobBot</div>
+    <div class="logo-sub">Bewerbungsmanager</div>
+  </div>
+
+  <div class="sidebar-section">Übersicht</div>
+  <div class="nav-item active" data-view="dashboard">
+    <span class="nav-icon">📊</span> Dashboard
+  </div>
+
+  <div class="sidebar-section">Workflow</div>
+  <div class="nav-item" data-view="scraper">
+    <span class="nav-icon">🔍</span> Scraper
+  </div>
+  <div class="nav-item" data-view="jobs">
+    <span class="nav-icon">💼</span> Jobs
+  </div>
+
+  <div class="sidebar-section">System</div>
+  <div class="nav-item" data-view="settings">
+    <span class="nav-icon">⚙️</span> Einstellungen
+  </div>
+
+  <div style="flex:1"></div>
+  <div id="health-dot" title="API Status"></div>
+</nav>
+
+<!-- Main -->
+<div id="main">
+  <!-- Topbar -->
+  <div id="topbar">
+    <div class="topbar-title" id="topbar-title">Dashboard</div>
+    <input class="search" id="search-input" placeholder="Jobs durchsuchen…" oninput="onSearch()" style="display:none">
+    <select class="filter" id="status-filter" onchange="loadJobs()" style="display:none">
+      <option value="">Alle Status</option>
+      <option value="pending">Ausstehend</option>
+      <option value="applied">Beworben</option>
+      <option value="interview">Interview</option>
+      <option value="rejected">Abgelehnt</option>
+      <option value="ignored">Ignoriert</option>
+    </select>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+
+    <!-- DASHBOARD VIEW -->
+    <div class="view active" id="view-dashboard">
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="stat-num" id="s-total">–</div><div class="stat-label">Gesamt</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-pending">–</div><div class="stat-label">Ausstehend</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-applied">–</div><div class="stat-label">Beworben</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-interview">–</div><div class="stat-label">Interview</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-rejected">–</div><div class="stat-label">Abgelehnt</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="detail-section-title" style="margin-bottom:12px">Schnellaktionen</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="navTo('scraper')">🔍 Neuer Scrape-Lauf</button>
+          <button class="btn btn-teal" onclick="navTo('jobs')">💼 Alle Jobs anzeigen</button>
+          <button class="btn btn-ghost" onclick="checkHealth()">🩺 Status prüfen</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="detail-section-title" style="margin-bottom:8px">System-Log</div>
+        <div id="log-box"></div>
+      </div>
+    </div>
+
+    <!-- SCRAPER VIEW -->
+    <div class="view" id="view-scraper">
+      <div class="card" style="margin-bottom:20px">
+        <div class="detail-section-title" style="margin-bottom:14px">Jobbörse durchsuchen</div>
+        <div class="scraper-form">
+          <div class="form-group">
+            <label class="form-label">Stichwörter</label>
+            <input class="form-input" id="kw-input" placeholder="Python Entwickler" value="Python Entwickler"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ort</label>
+            <input class="form-input" id="loc-input" placeholder="Berlin"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Seiten</label>
+            <input class="form-input form-input-sm" id="pages-input" type="number" value="3" min="1" max="20"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Jobs</label>
+            <input class="form-input form-input-sm" id="maxjobs-input" type="number" value="30" min="1" max="200"/>
+          </div>
+          <button class="btn btn-primary" id="scrape-btn" onclick="runScraper()">▶ Scrapen</button>
+        </div>
+        <div id="scraper-status" style="font-size:13px;color:var(--muted);margin-top:4px"></div>
+      </div>
+
+      <div class="card">
+        <div class="detail-section-title" style="margin-bottom:8px">Verlauf</div>
+        <div id="log-box" style="height:300px"></div>
+      </div>
+    </div>
+
+    <!-- JOBS VIEW -->
+    <div class="view" id="view-jobs">
+      <div id="jobs-list"></div>
+    </div>
+
+    <!-- SETTINGS VIEW -->
+    <div class="view" id="view-settings">
+      <div class="card">
+        <div class="detail-section-title" style="margin-bottom:12px">System-Status</div>
+        <div id="health-info" style="font-size:13px;line-height:2;color:var(--muted)">Lade…</div>
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <button class="btn btn-ghost" onclick="checkHealth()">🔄 Aktualisieren</button>
+          <button class="btn btn-ghost" onclick="sendTestEmail()">📧 Test-E-Mail senden</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- Job Detail Overlay -->
+<div id="overlay" onclick="closeDetail()"></div>
+
+<!-- Job Detail Panel -->
+<div id="detail-panel">
+  <div id="detail-header">
+    <div>
+      <div class="detail-title" id="dp-title">–</div>
+      <div class="detail-company" id="dp-company">–</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="closeDetail()">✕ Schließen</button>
+  </div>
+  <div id="detail-body">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <span id="dp-location" style="font-size:12px;color:var(--muted)"></span>
+      <span id="dp-badge"></span>
+      <select class="status-select" id="dp-status-sel" onchange="changeStatus()"></select>
+      <a id="dp-link" href="#" target="_blank" class="btn btn-ghost btn-sm">🔗 Anzeige öffnen</a>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Kontakt</div>
+      <div style="font-size:13px;color:var(--muted)">
+        <span id="dp-contact-name"></span>
+        <span id="dp-contact-email" style="margin-left:10px"></span>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Stellenbeschreibung</div>
+      <div class="desc-text" id="dp-desc">–</div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Bewerbung generieren</div>
+      <button class="btn btn-primary" id="gen-btn" onclick="generateApplication()">
+        ✨ Bewerbung mit KI generieren
+      </button>
+    </div>
+
+    <div class="detail-section" id="app-section" style="display:none">
+      <div class="detail-section-title">Bewerbungs-E-Mail</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label">Betreff</label>
+        <textarea class="textarea textarea-sm" id="app-subject" rows="2"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label">E-Mail-Text</label>
+        <textarea class="textarea textarea-lg" id="app-body" rows="10"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Anschreiben (optional)</label>
+        <textarea class="textarea textarea-lg" id="app-cover" rows="10"></textarea>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-ghost" onclick="saveEdits()">💾 Änderungen speichern</button>
+        <button class="btn btn-green" id="approve-btn" onclick="approveApplication()">✓ Genehmigen</button>
+        <button class="btn btn-primary" id="send-btn" onclick="sendEmail()" disabled>📧 E-Mail senden</button>
+      </div>
+      <div id="send-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let currentView = 'dashboard';
+let currentJob = null;
+let currentAppId = null;
+let searchTimer = null;
+const log = [];
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('/api' + path, opts);
+  return r.json();
+}
+
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  setTimeout(() => el.className = '', 3000);
+}
+
+function addLog(msg, type = 'info') {
+  const box = document.getElementById('log-box');
+  if (!box) return;
+  const line = document.createElement('div');
+  line.className = 'log-' + type;
+  line.textContent = `[${new Date().toLocaleTimeString('de-DE')}] ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function badge(status) {
+  const labels = { pending: 'Ausstehend', applied: 'Beworben', rejected: 'Abgelehnt', interview: 'Interview', ignored: 'Ignoriert' };
+  return `<span class="badge badge-${status}">${labels[status] || status}</span>`;
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+function navTo(view) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(`view-${view}`)?.classList.add('active');
+
+  const titles = { dashboard: 'Dashboard', scraper: 'Scraper', jobs: 'Jobs', settings: 'Einstellungen' };
+  document.getElementById('topbar-title').textContent = titles[view] || view;
+
+  const showSearch = view === 'jobs';
+  document.getElementById('search-input').style.display = showSearch ? '' : 'none';
+  document.getElementById('status-filter').style.display = showSearch ? '' : 'none';
+
+  currentView = view;
+
+  if (view === 'dashboard') loadStats();
+  if (view === 'jobs') loadJobs();
+  if (view === 'settings') checkHealth();
+}
+
+document.querySelectorAll('.nav-item').forEach(n => {
+  n.addEventListener('click', () => navTo(n.dataset.view));
+});
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const all = await api('GET', '/jobs?limit=1000');
+  const count = s => all.filter(j => j.status === s).length;
+  document.getElementById('s-total').textContent = all.length;
+  document.getElementById('s-pending').textContent = count('pending');
+  document.getElementById('s-applied').textContent = count('applied');
+  document.getElementById('s-interview').textContent = count('interview');
+  document.getElementById('s-rejected').textContent = count('rejected');
+}
+
+// ── Jobs list ──────────────────────────────────────────────────────────────────
+async function loadJobs() {
+  const search = document.getElementById('search-input').value;
+  const status = document.getElementById('status-filter').value;
+  const params = new URLSearchParams({ limit: 100 });
+  if (search) params.set('search', search);
+  if (status) params.set('status', status);
+
+  const jobs = await api('GET', `/jobs?${params}`);
+  const el = document.getElementById('jobs-list');
+
+  if (!jobs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Keine Jobs gefunden. Starte einen Scrape-Lauf!</div></div>';
+    return;
+  }
+
+  el.innerHTML = jobs.map(j => `
+    <div class="card job-card" onclick="openDetail(${j.id})">
+      <div>
+        <div class="job-title">${j.title}</div>
+        <div class="job-meta">
+          <span>🏢 ${j.company}</span>
+          ${j.location ? `<span>📍 ${j.location}</span>` : ''}
+          ${j.posted_date ? `<span>📅 ${j.posted_date}</span>` : ''}
+          ${j.contact_email ? `<span>📧 ${j.contact_email}</span>` : ''}
+        </div>
+      </div>
+      <div>${badge(j.status)}</div>
+    </div>
+  `).join('');
+}
+
+function onSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadJobs, 350);
+}
+
+// ── Detail panel ───────────────────────────────────────────────────────────────
+async function openDetail(jobId) {
+  const job = await api('GET', `/jobs/${jobId}`);
+  currentJob = job;
+  currentAppId = null;
+
+  document.getElementById('dp-title').textContent = job.title;
+  document.getElementById('dp-company').textContent = job.company;
+  document.getElementById('dp-location').textContent = job.location || '';
+  document.getElementById('dp-badge').innerHTML = badge(job.status);
+  document.getElementById('dp-desc').textContent = job.description || '(Keine Beschreibung)';
+  document.getElementById('dp-link').href = job.job_url;
+  document.getElementById('dp-contact-name').textContent = job.contact_name || '';
+  document.getElementById('dp-contact-email').textContent = job.contact_email ? `✉ ${job.contact_email}` : '';
+
+  const sel = document.getElementById('dp-status-sel');
+  const statuses = ['pending', 'applied', 'rejected', 'interview', 'ignored'];
+  sel.innerHTML = statuses.map(s => `<option value="${s}" ${s === job.status ? 'selected' : ''}>${s}</option>`).join('');
+
+  document.getElementById('app-section').style.display = 'none';
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('send-status').textContent = '';
+
+  document.getElementById('detail-panel').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+async function changeStatus() {
+  const status = document.getElementById('dp-status-sel').value;
+  await api('PATCH', `/jobs/${currentJob.id}/status`, { status });
+  document.getElementById('dp-badge').innerHTML = badge(status);
+  toast('Status aktualisiert');
+  if (currentView === 'jobs') loadJobs();
+}
+
+// ── Generate ───────────────────────────────────────────────────────────────────
+async function generateApplication() {
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Generiere…';
+  addLog(`Generiere Bewerbung für: ${currentJob.title} @ ${currentJob.company}…`);
+
+  try {
+    const res = await api('POST', `/jobs/${currentJob.id}/generate`);
+    if (!res.ok) throw new Error(res.error);
+
+    currentAppId = res.application_id;
+    document.getElementById('app-subject').value = res.email_subject;
+    document.getElementById('app-body').value = res.email_body;
+    document.getElementById('app-cover').value = res.cover_letter;
+    document.getElementById('app-section').style.display = '';
+    document.getElementById('approve-btn').textContent = '✓ Genehmigen';
+    document.getElementById('approve-btn').disabled = false;
+    document.getElementById('send-btn').disabled = true;
+    addLog('Bewerbung erfolgreich generiert.', 'ok');
+    toast('Bewerbung generiert! Bitte überprüfen und genehmigen.');
+  } catch (e) {
+    addLog('Fehler: ' + e.message, 'err');
+    toast('Fehler: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ Neu generieren';
+  }
+}
+
+// ── Save edits ─────────────────────────────────────────────────────────────────
+async function saveEdits() {
+  if (!currentAppId) return;
+  await api('PATCH', `/applications/${currentAppId}`, {
+    edited_subject: document.getElementById('app-subject').value,
+    edited_body: document.getElementById('app-body').value,
+    edited_cover: document.getElementById('app-cover').value,
+  });
+  toast('Änderungen gespeichert.');
+}
+
+// ── Approve ────────────────────────────────────────────────────────────────────
+async function approveApplication() {
+  if (!currentAppId) return;
+  await saveEdits();
+  const res = await api('POST', `/applications/${currentAppId}/approve`);
+  if (res.ok) {
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('approve-btn').textContent = '✓ Genehmigt';
+    document.getElementById('approve-btn').disabled = true;
+    toast('Genehmigt! Du kannst jetzt die E-Mail senden.');
+    addLog('Bewerbung genehmigt.', 'ok');
+  }
+}
+
+// ── Send ───────────────────────────────────────────────────────────────────────
+async function sendEmail() {
+  if (!currentAppId) return;
+  const confirm = window.confirm('E-Mail wirklich senden?');
+  if (!confirm) return;
+
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Sende…';
+
+  const res = await api('POST', `/applications/${currentAppId}/send`);
+  if (res.ok) {
+    document.getElementById('send-status').textContent = '✓ E-Mail erfolgreich gesendet!';
+    document.getElementById('dp-badge').innerHTML = badge('applied');
+    document.getElementById('dp-status-sel').value = 'applied';
+    addLog(`E-Mail an ${currentJob.contact_email} gesendet.`, 'ok');
+    toast('E-Mail gesendet!');
+    if (currentView === 'jobs') loadJobs();
+  } else {
+    document.getElementById('send-status').textContent = '✗ Fehler: ' + res.error;
+    addLog('Senden fehlgeschlagen: ' + res.error, 'err');
+    toast('Fehler: ' + res.error, 'err');
+    btn.disabled = false;
+    btn.textContent = '📧 E-Mail senden';
+  }
+}
+
+// ── Scraper ────────────────────────────────────────────────────────────────────
+async function runScraper() {
+  const btn = document.getElementById('scrape-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Läuft…';
+  document.getElementById('scraper-status').textContent = 'Scraper gestartet — das kann ein paar Minuten dauern…';
+  addLog(`Scrape: "${document.getElementById('kw-input').value}" in "${document.getElementById('loc-input').value}"…`);
+
+  try {
+    const res = await api('POST', '/scraper/run', {
+      keywords: document.getElementById('kw-input').value,
+      location: document.getElementById('loc-input').value,
+      max_pages: parseInt(document.getElementById('pages-input').value),
+      max_jobs: parseInt(document.getElementById('maxjobs-input').value),
+    });
+    const msg = res.ok
+      ? `✓ Fertig! ${res.saved} neue Jobs gespeichert.`
+      : `✗ Fehler: ${res.error}`;
+    document.getElementById('scraper-status').textContent = msg;
+    addLog(msg, res.ok ? 'ok' : 'err');
+    toast(msg, res.ok ? 'ok' : 'err');
+  } catch (e) {
+    document.getElementById('scraper-status').textContent = '✗ Netzwerkfehler';
+    addLog('Netzwerkfehler: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Scrapen';
+  }
+}
+
+// ── Health ─────────────────────────────────────────────────────────────────────
+async function checkHealth() {
+  const h = await api('GET', '/health');
+  const dot = document.getElementById('health-dot');
+  const ok = h.openai_configured && h.gmail_configured;
+  dot.className = ok ? 'ok' : 'warn';
+
+  document.getElementById('health-info').innerHTML = `
+    <div>${h.openai_configured ? '✅' : '❌'} OpenAI API konfiguriert</div>
+    <div>${h.gmail_configured ? '✅' : '❌'} Gmail konfiguriert</div>
+    <div>${h.cv_exists ? '✅' : '⚠️'} Lebenslauf (CV) gefunden</div>
+  `;
+  addLog('Status geprüft.', 'info');
+}
+
+async function sendTestEmail() {
+  const to = prompt('An welche E-Mail soll die Test-E-Mail gesendet werden?', '');
+  if (!to) return;
+  const res = await api('POST', '/email/test', { to });
+  toast(res.ok ? 'Test-E-Mail gesendet!' : 'Fehler: ' + res.error, res.ok ? 'ok' : 'err');
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+(async () => {
+  await checkHealth();
+  await loadStats();
+  addLog('JobBot gestartet.', 'ok');
+})();
+</script>
+</body>
+</html>
